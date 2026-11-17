@@ -1,0 +1,612 @@
+{
+  "entities": {
+    "Territory": {
+      "title": "Territory",
+      "description": "Sales territory (e.g., Laxmipur, Noakhali, Feni) with its assigned manager and team UIDs.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "managerUids": {
+          "type": "array"
+        },
+        "teamUids": {
+          "type": "array"
+        },
+        "sharedWithUids": {
+          "type": "array"
+        },
+        "createdByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "name", "active", "managerUids", "teamUids", "sharedWithUids", "createdByUid", "createdAt", "updatedAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Operational user profile for Admin, TSO, SR, and pending team members (no PII).",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "tso", "dealer", "sr", "pending"]
+        },
+        "territoryId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "distributorId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "srId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "role", "territoryId", "distributorId", "srId", "active", "createdAt", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated PII record containing user email and optional phone number.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["email", "phone", "updatedAt"]
+    },
+    "AdminMarker": {
+      "title": "AdminMarker",
+      "description": "Marker document granting admin privileges to a user UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "grantedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "grantedBy", "createdAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "SMC Enterprise SKU catalog entry with current unit price.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "group": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "price": {
+          "type": "number"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "sharedWithUids": {
+          "type": "array"
+        },
+        "createdByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "name", "group", "price", "active", "sharedWithUids", "createdByUid", "createdAt", "updatedAt"]
+    },
+    "Distributor": {
+      "title": "Distributor",
+      "description": "Territory distributor entity.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "territoryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "sharedWithUids": {
+          "type": "array"
+        },
+        "createdByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "territoryId", "name", "active", "sharedWithUids", "createdByUid", "createdAt", "updatedAt"]
+    },
+    "SalesRepresentative": {
+      "title": "SalesRepresentative",
+      "description": "Sales representative assigned to a territory distributor.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "territoryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "distributorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "sharedWithUids": {
+          "type": "array"
+        },
+        "createdByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "territoryId", "name", "distributorId", "active", "sharedWithUids", "createdByUid", "createdAt", "updatedAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Primary stock lifting or secondary sales header entry.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "territoryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["Primary Stock", "Secondary Sales"]
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "month": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^\\d{4}-\\d{2}$"
+        },
+        "distributorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "srId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "totalAmount": {
+          "type": "number"
+        },
+        "totalQty": {
+          "type": "number"
+        },
+        "itemCount": {
+          "type": "number"
+        },
+        "sharedWithUids": {
+          "type": "array"
+        },
+        "createdByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "territoryId", "kind", "date", "month", "distributorId", "srId", "totalAmount", "totalQty", "itemCount", "sharedWithUids", "createdByUid", "createdAt"]
+    },
+    "TransactionItem": {
+      "title": "TransactionItem",
+      "description": "Individual SKU line item linked atomically to a parent Transaction.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "transactionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "territoryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["Primary Stock", "Secondary Sales"]
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "month": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^\\d{4}-\\d{2}$"
+        },
+        "distributorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "srId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "productId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "product": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "group": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "qty": {
+          "type": "number"
+        },
+        "price": {
+          "type": "number"
+        },
+        "sharedWithUids": {
+          "type": "array"
+        },
+        "createdByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "transactionId", "territoryId", "kind", "date", "month", "distributorId", "srId", "productId", "product", "group", "qty", "price", "sharedWithUids", "createdByUid", "createdAt"]
+    },
+    "OpeningStock": {
+      "title": "OpeningStock",
+      "description": "Monthly opening stock quantity per territory, distributor, and SKU.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "territoryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "month": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^\\d{4}-\\d{2}$"
+        },
+        "distributorId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "productId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "qty": {
+          "type": "number"
+        },
+        "sharedWithUids": {
+          "type": "array"
+        },
+        "updatedByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "territoryId", "month", "distributorId", "productId", "qty", "sharedWithUids", "updatedByUid", "updatedAt"]
+    },
+    "PriceHistory": {
+      "title": "PriceHistory",
+      "description": "Audit log of product unit price changes.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "productId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "productName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "oldPrice": {
+          "type": "number"
+        },
+        "newPrice": {
+          "type": "number"
+        },
+        "effectiveDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "sharedWithUids": {
+          "type": "array"
+        },
+        "changedByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "productId", "productName", "oldPrice", "newPrice", "effectiveDate", "sharedWithUids", "changedByUid", "createdAt"]
+    },
+    "TerritoryConfig": {
+      "title": "TerritoryConfig",
+      "description": "Legacy/global non-PII territory membership roster.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "managerUids": {
+          "type": "array"
+        },
+        "teamUids": {
+          "type": "array"
+        },
+        "updatedByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "managerUids", "teamUids", "updatedByUid", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/territories/{territoryId}": {
+      "schema": { "$ref": "#/entities/Territory" },
+      "description": "Active sales territories and their assigned team UIDs."
+    },
+    "/territoryConfig/{configId}": {
+      "schema": { "$ref": "#/entities/TerritoryConfig" },
+      "description": "Legacy territory manager and team UID lists."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Operational user profile and RBAC role/territory assignment."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Isolated PII document holding email and phone."
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminMarker" },
+      "description": "Admin role marker registry."
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Shared SMC product catalog and active unit prices."
+    },
+    "/distributors/{distributorId}": {
+      "schema": { "$ref": "#/entities/Distributor" },
+      "description": "Distributors scoped by territoryId."
+    },
+    "/srs/{srId}": {
+      "schema": { "$ref": "#/entities/SalesRepresentative" },
+      "description": "Sales representatives scoped by territoryId and distributorId."
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Primary stock and secondary sales headers scoped by territoryId."
+    },
+    "/transactionItems/{itemId}": {
+      "schema": { "$ref": "#/entities/TransactionItem" },
+      "description": "Atomic line items belonging to transactions."
+    },
+    "/openingStocks/{openingId}": {
+      "schema": { "$ref": "#/entities/OpeningStock" },
+      "description": "Monthly opening stock quantities per territory, distributor, and product."
+    },
+    "/priceHistory/{historyId}": {
+      "schema": { "$ref": "#/entities/PriceHistory" },
+      "description": "Price change history entries."
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Team Sales Pro",
+  "description": "Territory sales, distributor stock ledger, and SR performance workspace for SMC Enterprise Laxmipur Territory.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

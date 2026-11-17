@@ -1,0 +1,594 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Global Hardened Helpers
+    // -------------------------------------------------------------------------
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(uid) {
+      return isVerified() && request.auth.uid == uid;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidUidList(arr, maxLen) {
+      return arr is list
+        && arr.size() <= maxLen
+        && (arr.size() == 0 || (arr[0] is string && arr[0].size() >= 1 && arr[0].size() <= 128));
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerified() && request.auth.token.email == 'imran972913@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin()
+        || (isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function hasUserDoc() {
+      return isVerified() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isTso() {
+      return hasUserDoc() && userDoc().active == true && userDoc().role == 'tso';
+    }
+
+    function isDealer() {
+      return hasUserDoc() && userDoc().active == true && userDoc().role == 'dealer';
+    }
+
+    function isSr() {
+      return hasUserDoc() && userDoc().active == true && userDoc().role == 'sr';
+    }
+
+    function isApprovedTeam() {
+      return isAdmin() || isTso() || isDealer() || isSr();
+    }
+
+    // -------------------------------------------------------------------------
+    // Validation Blueprints (Anti-Update-Gap)
+    // -------------------------------------------------------------------------
+    function isValidTerritory(data, territoryId) {
+      return data.keys().hasAll(['id', 'name', 'active', 'managerUids', 'teamUids', 'sharedWithUids', 'createdByUid', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'active', 'managerUids', 'teamUids', 'sharedWithUids', 'createdByUid', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.id == territoryId
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && data.active is bool
+        && isValidUidList(data.managerUids, 25)
+        && isValidUidList(data.teamUids, 100)
+        && isValidUidList(data.sharedWithUids, 100)
+        && isValidId(data.createdByUid)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'role', 'territoryId', 'distributorId', 'srId', 'active', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'role', 'territoryId', 'distributorId', 'srId', 'active', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.uid == userId
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80
+        && data.role in ['admin', 'tso', 'dealer', 'sr', 'pending']
+        && data.territoryId is string && data.territoryId.size() <= 128
+        && data.distributorId is string && data.distributorId.size() <= 128
+        && data.srId is string && data.srId.size() <= 128
+        && data.active is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivateInfo(data) {
+      return data.keys().hasAll(['email', 'phone', 'updatedAt'])
+        && data.keys().hasOnly(['email', 'phone', 'updatedAt'])
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 120
+        && data.phone is string && data.phone.size() <= 30
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAdminMarker(data, userId) {
+      return data.keys().hasAll(['uid', 'grantedBy', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'grantedBy', 'createdAt'])
+        && isValidId(data.uid)
+        && data.uid == userId
+        && data.grantedBy is string && data.grantedBy.size() >= 1 && data.grantedBy.size() <= 128
+        && data.createdAt is timestamp;
+    }
+
+    function isValidTerritoryConfig(data, configId) {
+      return data.keys().hasAll(['id', 'managerUids', 'teamUids', 'updatedByUid', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'managerUids', 'teamUids', 'updatedByUid', 'updatedAt'])
+        && isValidId(data.id)
+        && data.id == configId
+        && isValidUidList(data.managerUids, 25)
+        && isValidUidList(data.teamUids, 100)
+        && isValidId(data.updatedByUid)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidProduct(data, productId) {
+      return data.keys().hasAll(['id', 'name', 'group', 'price', 'active', 'sharedWithUids', 'createdByUid', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'name', 'group', 'price', 'active', 'sharedWithUids', 'createdByUid', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.id == productId
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.group is string && data.group.size() >= 1 && data.group.size() <= 60
+        && data.price is number && data.price >= 0 && data.price <= 1000000
+        && data.active is bool
+        && isValidUidList(data.sharedWithUids, 500)
+        && isValidId(data.createdByUid)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDistributor(data, distributorId) {
+      return data.keys().hasAll(['id', 'territoryId', 'name', 'active', 'sharedWithUids', 'createdByUid', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'territoryId', 'name', 'active', 'sharedWithUids', 'createdByUid', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.id == distributorId
+        && isValidId(data.territoryId)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && data.active is bool
+        && isValidUidList(data.sharedWithUids, 100)
+        && isValidId(data.createdByUid)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSr(data, srId) {
+      return data.keys().hasAll(['id', 'territoryId', 'name', 'distributorId', 'active', 'sharedWithUids', 'createdByUid', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'territoryId', 'name', 'distributorId', 'active', 'sharedWithUids', 'createdByUid', 'createdAt', 'updatedAt'])
+        && isValidId(data.id)
+        && data.id == srId
+        && isValidId(data.territoryId)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 100
+        && isValidId(data.distributorId)
+        && data.active is bool
+        && isValidUidList(data.sharedWithUids, 100)
+        && isValidId(data.createdByUid)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTransaction(data, txId) {
+      return data.keys().hasAll(['id', 'territoryId', 'kind', 'date', 'month', 'distributorId', 'srId', 'totalAmount', 'totalQty', 'itemCount', 'sharedWithUids', 'createdByUid', 'createdAt'])
+        && data.keys().hasOnly(['id', 'territoryId', 'kind', 'date', 'month', 'distributorId', 'srId', 'totalAmount', 'totalQty', 'itemCount', 'sharedWithUids', 'createdByUid', 'createdAt'])
+        && isValidId(data.id)
+        && data.id == txId
+        && isValidId(data.territoryId)
+        && data.kind in ['Primary Stock', 'Secondary Sales']
+        && data.date is string && data.date.size() == 10 && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.month is string && data.month.size() == 7 && data.month.matches('^\\d{4}-\\d{2}$')
+        && isValidId(data.distributorId)
+        && data.srId is string && data.srId.size() <= 128
+        && (data.kind == 'Primary Stock' || isValidId(data.srId))
+        && data.totalAmount is number && data.totalAmount >= 0 && data.totalAmount <= 100000000
+        && data.totalQty is number && data.totalQty > 0 && data.totalQty <= 10000000
+        && data.itemCount is number && data.itemCount >= 1 && data.itemCount <= 200
+        && isValidUidList(data.sharedWithUids, 25)
+        && isValidId(data.createdByUid)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidTransactionItem(data, itemId) {
+      return data.keys().hasAll(['id', 'transactionId', 'territoryId', 'kind', 'date', 'month', 'distributorId', 'srId', 'productId', 'product', 'group', 'qty', 'price', 'sharedWithUids', 'createdByUid', 'createdAt'])
+        && data.keys().hasOnly(['id', 'transactionId', 'territoryId', 'kind', 'date', 'month', 'distributorId', 'srId', 'productId', 'product', 'group', 'qty', 'price', 'sharedWithUids', 'createdByUid', 'createdAt'])
+        && isValidId(data.id)
+        && data.id == itemId
+        && isValidId(data.transactionId)
+        && isValidId(data.territoryId)
+        && data.kind in ['Primary Stock', 'Secondary Sales']
+        && data.date is string && data.date.size() == 10 && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.month is string && data.month.size() == 7 && data.month.matches('^\\d{4}-\\d{2}$')
+        && isValidId(data.distributorId)
+        && data.srId is string && data.srId.size() <= 128
+        && isValidId(data.productId)
+        && data.product is string && data.product.size() >= 1 && data.product.size() <= 120
+        && data.group is string && data.group.size() >= 1 && data.group.size() <= 60
+        && data.qty is number && data.qty > 0 && data.qty <= 1000000
+        && data.price is number && data.price >= 0 && data.price <= 1000000
+        && isValidUidList(data.sharedWithUids, 25)
+        && isValidId(data.createdByUid)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidOpeningStock(data, openingId) {
+      return data.keys().hasAll(['id', 'territoryId', 'month', 'distributorId', 'productId', 'qty', 'sharedWithUids', 'updatedByUid', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'territoryId', 'month', 'distributorId', 'productId', 'qty', 'sharedWithUids', 'updatedByUid', 'updatedAt'])
+        && isValidId(data.id)
+        && data.id == openingId
+        && isValidId(data.territoryId)
+        && data.month is string && data.month.size() == 7 && data.month.matches('^\\d{4}-\\d{2}$')
+        && isValidId(data.distributorId)
+        && isValidId(data.productId)
+        && data.qty is number && data.qty >= 0 && data.qty <= 10000000
+        && isValidUidList(data.sharedWithUids, 100)
+        && isValidId(data.updatedByUid)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPriceHistory(data, historyId) {
+      return data.keys().hasAll(['id', 'productId', 'productName', 'oldPrice', 'newPrice', 'effectiveDate', 'sharedWithUids', 'changedByUid', 'createdAt'])
+        && data.keys().hasOnly(['id', 'productId', 'productName', 'oldPrice', 'newPrice', 'effectiveDate', 'sharedWithUids', 'changedByUid', 'createdAt'])
+        && isValidId(data.id)
+        && data.id == historyId
+        && isValidId(data.productId)
+        && data.productName is string && data.productName.size() >= 1 && data.productName.size() <= 120
+        && data.oldPrice is number && data.oldPrice >= 0 && data.oldPrice <= 1000000
+        && data.newPrice is number && data.newPrice >= 0 && data.newPrice <= 1000000
+        && data.effectiveDate is string && data.effectiveDate.size() == 10 && data.effectiveDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && isValidUidList(data.sharedWithUids, 500)
+        && isValidId(data.changedByUid)
+        && data.createdAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules
+    // -------------------------------------------------------------------------
+    match /territories/{territoryId} {
+      allow get: if isValidId(territoryId) && isVerified() && isApprovedTeam();
+      allow list: if isBootstrappedAdmin() || (isVerified() && request.auth.uid in resource.data.sharedWithUids);
+
+      allow create: if isValidId(territoryId)
+        && isAdmin()
+        && isValidTerritory(incoming(), territoryId)
+        && incoming().createdByUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(territoryId)
+        && isAdmin()
+        && isValidTerritory(incoming(), territoryId)
+        && incoming().id == existing().id
+        && incoming().createdByUid == existing().createdByUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'active', 'managerUids', 'teamUids', 'sharedWithUids', 'updatedAt']);
+
+      allow delete: if isValidId(territoryId) && isAdmin();
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isVerified() && (isOwner(userId) || isAdmin());
+      allow list: if isBootstrappedAdmin() || (isVerified() && resource.data.uid == request.auth.uid);
+
+      allow create: if isValidId(userId)
+        && isVerified()
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (isBootstrappedAdmin() && isOwner(userId) && incoming().role == 'admin' && incoming().active == true)
+          || (isOwner(userId) && incoming().role == 'pending' && incoming().active == true && incoming().territoryId == '' && incoming().distributorId == '' && incoming().srId == '')
+          || isAdmin()
+        );
+
+      allow update: if isValidId(userId)
+        && isVerified()
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'territoryId', 'distributorId', 'srId', 'active', 'updatedAt']))
+          || (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(userId) && isAdmin();
+
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && docId == 'info' && isVerified() && (isOwner(userId) || isAdmin());
+        allow list: if false;
+        allow create, update: if isValidId(userId)
+          && isValidId(docId)
+          && docId == 'info'
+          && isVerified()
+          && (isOwner(userId) || isAdmin())
+          && isValidUserPrivateInfo(incoming())
+          && incoming().updatedAt == request.time;
+        allow delete: if isValidId(userId) && isValidId(docId) && isAdmin();
+      }
+    }
+
+    match /admins/{userId} {
+      allow get: if isValidId(userId) && isVerified() && (isOwner(userId) || isAdmin());
+      allow list: if isBootstrappedAdmin();
+      allow create: if isValidId(userId)
+        && isVerified()
+        && isValidAdminMarker(incoming(), userId)
+        && incoming().createdAt == request.time
+        && (isBootstrappedAdmin() || isAdmin());
+      allow update: if false;
+      allow delete: if isValidId(userId) && isBootstrappedAdmin();
+    }
+
+    match /territoryConfig/{configId} {
+      allow get: if isValidId(configId) && isVerified() && isApprovedTeam();
+      allow list: if isBootstrappedAdmin();
+      allow create, update: if isValidId(configId)
+        && isAdmin()
+        && isValidTerritoryConfig(incoming(), configId)
+        && incoming().updatedByUid == request.auth.uid
+        && incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    match /products/{productId} {
+      allow get: if isValidId(productId) && isVerified() && isApprovedTeam();
+      allow list: if isBootstrappedAdmin() || (isVerified() && request.auth.uid in resource.data.sharedWithUids);
+
+      allow create: if isValidId(productId)
+        && isAdmin()
+        && isValidProduct(incoming(), productId)
+        && incoming().createdByUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(productId)
+        && isAdmin()
+        && isValidProduct(incoming(), productId)
+        && incoming().id == existing().id
+        && incoming().createdByUid == existing().createdByUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'group', 'price', 'active', 'sharedWithUids', 'updatedAt']);
+
+      allow delete: if isValidId(productId) && isAdmin();
+    }
+
+    match /distributors/{distributorId} {
+      allow get: if isValidId(distributorId) && isVerified() && isApprovedTeam();
+      allow list: if isBootstrappedAdmin() || (isVerified() && request.auth.uid in resource.data.sharedWithUids);
+
+      allow create: if isValidId(distributorId)
+        && (isAdmin() || (isTso() && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId)))
+        && isValidDistributor(incoming(), distributorId)
+        && incoming().createdByUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/territories/$(incoming().territoryId));
+
+      allow update: if isValidId(distributorId)
+        && (isAdmin() || (isTso() && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId)))
+        && isValidDistributor(incoming(), distributorId)
+        && incoming().id == existing().id
+        && incoming().createdByUid == existing().createdByUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/territories/$(incoming().territoryId))
+        && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['territoryId', 'name', 'active', 'sharedWithUids', 'updatedAt']))
+          || (isTso() && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'active', 'sharedWithUids', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(distributorId) && isAdmin();
+    }
+
+    match /srs/{srId} {
+      allow get: if isValidId(srId) && isVerified() && isApprovedTeam();
+      allow list: if isBootstrappedAdmin() || (isVerified() && request.auth.uid in resource.data.sharedWithUids);
+
+      allow create: if isValidId(srId)
+        && (
+          isAdmin()
+          || (isTso() && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId))
+          || (isDealer() && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId) && userDoc().distributorId == incoming().distributorId)
+        )
+        && isValidSr(incoming(), srId)
+        && incoming().createdByUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/territories/$(incoming().territoryId))
+        && exists(/databases/$(database)/documents/distributors/$(incoming().distributorId));
+
+      allow update: if isValidId(srId)
+        && (
+          isAdmin()
+          || (isTso() && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId))
+          || (isDealer() && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId) && userDoc().distributorId == existing().distributorId && userDoc().distributorId == incoming().distributorId)
+        )
+        && isValidSr(incoming(), srId)
+        && incoming().id == existing().id
+        && incoming().createdByUid == existing().createdByUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/territories/$(incoming().territoryId))
+        && exists(/databases/$(database)/documents/distributors/$(incoming().distributorId))
+        && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['territoryId', 'name', 'distributorId', 'active', 'sharedWithUids', 'updatedAt']))
+          || (isTso() && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'distributorId', 'active', 'sharedWithUids', 'updatedAt']))
+          || (isDealer() && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'active', 'sharedWithUids', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(srId) && isAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      allow get: if isValidId(transactionId)
+        && isVerified()
+        && (
+          isAdmin()
+          || (isTso() && (userDoc().territoryId == '' || userDoc().territoryId == resource.data.territoryId))
+          || resource.data.createdByUid == request.auth.uid
+          || request.auth.uid in resource.data.sharedWithUids
+        );
+      allow list: if isBootstrappedAdmin()
+        || (isVerified() && (resource.data.createdByUid == request.auth.uid || request.auth.uid in resource.data.sharedWithUids));
+
+      allow create: if isValidId(transactionId)
+        && isVerified()
+        && isValidTransaction(incoming(), transactionId)
+        && incoming().createdByUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/territories/$(incoming().territoryId))
+        && exists(/databases/$(database)/documents/distributors/$(incoming().distributorId))
+        && (incoming().kind == 'Primary Stock' || exists(/databases/$(database)/documents/srs/$(incoming().srId)))
+        && (
+          isAdmin()
+          || (isTso() && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId))
+          || (
+            isDealer()
+            && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId)
+            && userDoc().distributorId == incoming().distributorId
+          )
+          || (
+            isSr()
+            && incoming().kind == 'Secondary Sales'
+            && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId)
+            && userDoc().distributorId == incoming().distributorId
+            && (userDoc().srId == '' || userDoc().srId == incoming().srId)
+          )
+        );
+
+      allow update: if isValidId(transactionId)
+        && (isAdmin() || isTso())
+        && isValidTransaction(incoming(), transactionId)
+        && incoming().id == existing().id
+        && incoming().createdByUid == existing().createdByUid
+        && incoming().createdAt == existing().createdAt
+        && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['territoryId', 'sharedWithUids', 'date', 'month', 'distributorId', 'srId', 'totalAmount', 'totalQty', 'itemCount']))
+          || (isTso() && incoming().diff(existing()).affectedKeys().hasOnly(['sharedWithUids']))
+        );
+
+      allow delete: if isValidId(transactionId) && isAdmin();
+    }
+
+    match /transactionItems/{itemId} {
+      allow get: if isValidId(itemId)
+        && isVerified()
+        && (
+          isAdmin()
+          || (isTso() && (userDoc().territoryId == '' || userDoc().territoryId == resource.data.territoryId))
+          || resource.data.createdByUid == request.auth.uid
+          || request.auth.uid in resource.data.sharedWithUids
+        );
+      allow list: if isBootstrappedAdmin()
+        || (isVerified() && (resource.data.createdByUid == request.auth.uid || request.auth.uid in resource.data.sharedWithUids));
+
+      allow create: if isValidId(itemId)
+        && isVerified()
+        && isValidTransactionItem(incoming(), itemId)
+        && incoming().createdByUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && existsAfter(/databases/$(database)/documents/transactions/$(incoming().transactionId))
+        && exists(/databases/$(database)/documents/products/$(incoming().productId))
+        && (
+          isAdmin()
+          || (isTso() && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId))
+          || (
+            isDealer()
+            && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId)
+            && userDoc().distributorId == incoming().distributorId
+          )
+          || (
+            isSr()
+            && incoming().kind == 'Secondary Sales'
+            && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId)
+            && userDoc().distributorId == incoming().distributorId
+            && (userDoc().srId == '' || userDoc().srId == incoming().srId)
+          )
+        );
+
+      allow update: if isValidId(itemId)
+        && isAdmin()
+        && isValidTransactionItem(incoming(), itemId)
+        && incoming().id == existing().id
+        && incoming().transactionId == existing().transactionId
+        && incoming().createdByUid == existing().createdByUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['territoryId', 'sharedWithUids']);
+
+      allow delete: if isValidId(itemId) && isAdmin();
+    }
+
+    match /openingStocks/{openingId} {
+      allow get: if isValidId(openingId) && isVerified() && isApprovedTeam();
+      allow list: if isBootstrappedAdmin() || (isVerified() && request.auth.uid in resource.data.sharedWithUids);
+
+      allow create: if isValidId(openingId)
+        && (
+          isAdmin()
+          || (isTso() && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId))
+          || (isDealer() && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId) && userDoc().distributorId == incoming().distributorId)
+        )
+        && isValidOpeningStock(incoming(), openingId)
+        && incoming().updatedByUid == request.auth.uid
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/territories/$(incoming().territoryId))
+        && exists(/databases/$(database)/documents/distributors/$(incoming().distributorId))
+        && exists(/databases/$(database)/documents/products/$(incoming().productId));
+
+      allow update: if isValidId(openingId)
+        && (
+          isAdmin()
+          || (isTso() && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId))
+          || (isDealer() && (userDoc().territoryId == '' || userDoc().territoryId == incoming().territoryId) && userDoc().distributorId == existing().distributorId && userDoc().distributorId == incoming().distributorId)
+        )
+        && isValidOpeningStock(incoming(), openingId)
+        && incoming().id == existing().id
+        && incoming().month == existing().month
+        && incoming().distributorId == existing().distributorId
+        && incoming().productId == existing().productId
+        && incoming().updatedByUid == request.auth.uid
+        && incoming().updatedAt == request.time
+        && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['territoryId', 'qty', 'sharedWithUids', 'updatedByUid', 'updatedAt']))
+          || ((isTso() || isDealer()) && incoming().diff(existing()).affectedKeys().hasOnly(['qty', 'sharedWithUids', 'updatedByUid', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(openingId) && isAdmin();
+    }
+
+    match /priceHistory/{historyId} {
+      allow get: if isValidId(historyId) && isVerified() && isApprovedTeam();
+      allow list: if isBootstrappedAdmin() || (isVerified() && request.auth.uid in resource.data.sharedWithUids);
+
+      allow create: if isValidId(historyId)
+        && isAdmin()
+        && isValidPriceHistory(incoming(), historyId)
+        && incoming().changedByUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/products/$(incoming().productId));
+
+      allow update: if isValidId(historyId)
+        && isAdmin()
+        && isValidPriceHistory(incoming(), historyId)
+        && incoming().id == existing().id
+        && incoming().productId == existing().productId
+        && incoming().changedByUid == existing().changedByUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['sharedWithUids']);
+
+      allow delete: if isValidId(historyId) && isAdmin();
+    }
+  }
+}
